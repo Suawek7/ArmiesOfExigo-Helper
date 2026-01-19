@@ -1,0 +1,105 @@
+-- Get base path from Cheat Engine (folder where this script/trainer is located)
+local basePath = TrainerOrigin or ""
+
+-- Build absolute paths to config files
+local exigoHelperConf = basePath .. "ExigoHelper.conf"
+local devToolsConf = basePath .. "eh_devtools\\DevTools.conf"
+
+-- Function to read a value from a config file
+function readConfigValue(filePath, keyName)
+    local file = io.open(filePath, "r")
+    if not file then
+        print("Error: Cannot open config file: " .. filePath)
+        return nil
+    end
+
+    for line in file:lines() do
+        -- Match pattern: KeyName="Value" or KeyName=Value
+        local pattern1 = keyName .. '="([^"]*)"'
+        local pattern2 = keyName .. "=([^%s]+)"
+
+        local value = line:match(pattern1) or line:match(pattern2)
+        if value then
+            file:close()
+            return value
+        end
+    end
+
+    file:close()
+    print("Warning: Key not found: " .. keyName .. " in " .. filePath)
+    return nil
+end
+
+-- Read ExigoSystemPath from ExigoHelper.conf
+local exigoSystemPath = readConfigValue(exigoHelperConf, "ExigoSystemPath")
+if not exigoSystemPath then
+    print("Error: Could not read ExigoSystemPath")
+    return
+end
+
+-- Read executable name from DevTools.conf
+local exeName = readConfigValue(devToolsConf, "DevToolsExigoSpeedhackExecutableName")
+if not exeName then
+    print("Error: Could not read DevToolsExigoSpeedhackExecutableName")
+    return
+end
+
+-- Build full game path
+local gamePath = exigoSystemPath .. "\\" .. exeName
+
+-- Read speedValue from DevTools.conf
+local speedValueStr = readConfigValue(devToolsConf, "DevToolsExigoSpeedhackValue")
+local speedValue = tonumber(speedValueStr) or 5
+
+-- Read waitTime from DevTools.conf
+local waitTimeStr = readConfigValue(devToolsConf, "DevToolsExigoSpeedhackWaitTime")
+local waitTime = tonumber(waitTimeStr) or 5000
+
+print("Base path: " .. basePath)
+print("Configuration loaded:")
+print("  Game path: " .. gamePath)
+print("  Speed value: " .. speedValue)
+print("  Wait time: " .. waitTime)
+
+-- Function to attach to the game process
+function autoAttach(gameProcessName)
+    print("Looking for the game process...")
+    local processList = getProcesslist()
+    for processId, processName in pairs(processList) do
+        if processName:lower():find(gameProcessName:lower()) then
+            openProcess(processId)
+            print("Attached to: " .. processName)
+            return true
+        end
+    end
+    print("Game process not found.")
+    return false
+end
+
+-- Function to start the game
+function startGame()
+    print("Starting the game...")
+    local result = os.execute('start "" "' .. gamePath .. '"')
+    if result then
+        print("Game started successfully!")
+        return true
+    else
+        print("Failed to start the game.")
+        return false
+    end
+end
+
+-- Main execution
+if startGame() then
+    print("Waiting for the game to load...")
+    sleep(waitTime)
+    local gameProcessName = string.match(gamePath, "([^\\]+%.exe)$")
+    if autoAttach(gameProcessName) then
+        print("Applying speed hack...")
+        if speedhack_setSpeed(speedValue) then
+            print("Speed hack applied: " .. speedValue)
+        else
+            print("Failed to apply speed hack.")
+        end
+    end
+end
