@@ -5,13 +5,14 @@
 #include <filesystem>
 #include <windows.h>
 #include <sstream>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
 std::string gamePath;
 std::string gameExecutable = "Exigo.exe";
 std::string editorExecutable = "";
-std::string appVersion = "0.1";
+std::string appVersion = "0.2";
 
 // DevTools configuration.
 bool devToolsEnabled = false;
@@ -37,7 +38,7 @@ std::string trim(const std::string& str) {
 
 // Change SpeedHack value in DevTools.conf.
 void changeSpeedHackValue() {
-    std::string configFile = "eh_devtools/DevTools.conf";
+    std::string configFile = "devtools\\DevTools.conf";
     
     if (!fs::exists(configFile)) {
         setConsoleColor(12); // Red
@@ -124,7 +125,7 @@ bool extractBoolValue(const std::string& line) {
 
 // Load DevTools configuration.
 void loadDevToolsConfig() {
-    std::string configFile = "eh_devtools/DevTools.conf";
+    std::string configFile = "devtools\\DevTools.conf"; 
     
     if (!fs::exists(configFile)) {
         return; // DevTools config doesn't exist, keep disabled.
@@ -267,7 +268,7 @@ bool loadGamePath() {
     }
 
     // Check DataORKs folder.
-    std::string dataOrksPath = gamePath + "\\DataORKs";
+    std::string dataOrksPath = "resources\\DataORKs";
     bool dataOrksFolderFound = false;
     if (fs::exists(dataOrksPath) && fs::is_directory(dataOrksPath)) {
         dataOrksFolderFound = true;
@@ -291,7 +292,7 @@ std::string getFullPath(const std::string& relativePath) {
 
 // Display current game version from version file.
 void showCurrentVersion() {
-    std::string versionFile = getFullPath("DataORKs\\Game_version.txt");
+    std::string versionFile = "resources\\DataORKs\\Game_version.txt";
     
     if (fs::exists(versionFile)) {
         try {
@@ -348,7 +349,7 @@ void copyDataFiles(const std::string& sourceFolder, const std::string& versionNa
     }
     
     // Save version to file.
-    std::string versionFile = getFullPath("DataORKs\\Game_version.txt");
+    std::string versionFile = "resources\\DataORKs\\Game_version.txt";
     if (fs::exists(versionFile)) {
         fs::remove(versionFile);
     }
@@ -369,7 +370,7 @@ void copyDataFiles(const std::string& sourceFolder, const std::string& versionNa
 
 // Handle version change menu and operations.
 void handleVersionChange() {
-    std::string dataOrksPath = getFullPath("DataORKs");
+    std::string dataOrksPath = "resources\\DataORKs";
     
     // Check if DataORKs folder exists
     if (!fs::exists(dataOrksPath)) {
@@ -382,15 +383,43 @@ void handleVersionChange() {
         return;
     }
     
-    // Get list of version folders
-    std::vector<std::string> folders;
+    // Read version priorities from file
+    std::string prioritiesFile = dataOrksPath + "\\VersionPriorities.conf";
+    std::vector<std::string> orderedFolders;
+    
+    if (fs::exists(prioritiesFile)) {
+        std::ifstream file(prioritiesFile);
+        std::string line;
+        
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (!line.empty() && line[0] != '#') {  // Skip empty lines and comments
+                // Check if folder exists
+                std::string folderPath = dataOrksPath + "\\" + line;
+                if (fs::exists(folderPath) && fs::is_directory(folderPath)) {
+                    orderedFolders.push_back(line);
+                }
+            }
+        }
+        file.close();
+    }
+    
+    // Get all folders from DataORKs directory
+    std::vector<std::string> allFolders;
     for (const auto& entry : fs::directory_iterator(dataOrksPath)) {
         if (entry.is_directory()) {
-            folders.push_back(entry.path().filename().string());
+            allFolders.push_back(entry.path().filename().string());
         }
     }
-
-    if (folders.empty()) {
+    
+    // Add any folders that exist but are not in VersionPriorities (append at the end)
+    for (const auto& folder : allFolders) {
+        if (std::find(orderedFolders.begin(), orderedFolders.end(), folder) == orderedFolders.end()) {
+            orderedFolders.push_back(folder);
+        }
+    }
+    
+    if (orderedFolders.empty()) {
         setConsoleColor(12); // Red
         std::cout << "No version folders found in DataORKs!" << std::endl;
         setConsoleColor(7);
@@ -405,20 +434,20 @@ void handleVersionChange() {
     std::cout << "\nAvailable versions:" << std::endl;
     setConsoleColor(7);
     
-    for (size_t i = 0; i < folders.size(); i++) {
-        std::cout << (i + 1) << ". " << folders[i] << std::endl;
+    for (size_t i = 0; i < orderedFolders.size(); i++) {
+        std::cout << (i + 1) << ". " << orderedFolders[i] << std::endl;
     }
     std::cout << std::endl;
     
     // Get user selection
     int versionChoice;
     do {
-        std::cout << "Select version (1-" << folders.size() << "): ";
+        std::cout << "Select version (1-" << orderedFolders.size() << "): ";
         std::cin >> versionChoice;
-    } while (versionChoice < 1 || versionChoice > static_cast<int>(folders.size()));
+    } while (versionChoice < 1 || versionChoice > static_cast<int>(orderedFolders.size()));
     
-    std::string selectedFolder = dataOrksPath + "\\" + folders[versionChoice - 1];
-    std::string selectedName = folders[versionChoice - 1];
+    std::string selectedFolder = dataOrksPath + "\\" + orderedFolders[versionChoice - 1];
+    std::string selectedName = orderedFolders[versionChoice - 1];
     
     setConsoleColor(14); // Yellow
     // Confirm action
@@ -516,7 +545,7 @@ void launchGameWithSpeedHack() {
         return;
     }
     
-    std::string speedHackExePath = getFullPath(DevToolsExigoSpeedhackInitiatorExecutableName);
+    std::string speedHackExePath = fs::current_path().string() + "\\devtools\\" + DevToolsExigoSpeedhackInitiatorExecutableName;
     
     if (!fs::exists(speedHackExePath)) {
         setConsoleColor(12); // Red
@@ -629,7 +658,7 @@ void buildAndLaunchWithSpeedHack() {
         return;
     }
     
-    std::string speedHackExePath = getFullPath(DevToolsExigoSpeedhackInitiatorExecutableName);
+    std::string speedHackExePath = fs::current_path().string() + "\\devtools\\" + DevToolsExigoSpeedhackInitiatorExecutableName;
     
     if (!fs::exists(speedHackExePath)) {
         setConsoleColor(12); // Red
@@ -967,10 +996,10 @@ int main() {
         std::cout << "CRITICAL ERROR: Invalid configuration!" << std::endl;
         std::cout << "========================================" << std::endl;
         std::cout << "\nPlease fix the following issues:" << std::endl;
-        std::cout << "1. Make sure ExigoHelper.conf exists and contains valid ExigoSystemPath" << std::endl;
-        std::cout << "2. Verify that game executable exists in the specified path" << std::endl;
-        std::cout << "3. Verify that editor executable exists (if specified)" << std::endl;
-        std::cout << "4. Make sure DataORKs folder exists in the game directory" << std::endl;
+        std::cout << "1. If you are running application for the first time, rename ExigoHelper.conf.example to ExigoHelper.conf, open it via text editor and adjust game paths" << std::endl;
+        std::cout << "2. Make sure ExigoHelper.conf exists and contains valid ExigoSystemPath" << std::endl;
+        std::cout << "3. Verify that game executable exists in the specified path" << std::endl;
+        std::cout << "4. Verify that editor executable exists (if specified)" << std::endl;
         setConsoleColor(7);
         std::cout << "\nProgram cannot continue with invalid configuration." << std::endl;
         std::cout << std::endl;

@@ -1,0 +1,17 @@
+Version: 1.4.02_08
+	Non-test release:
+		- changed main menu version from 1.4.02_08_test1 to 1.4.02_08
+
+Version: 1.4.02_08_test1
+	Balance changes:
+		Empire
+			Knight
+				Fire Vulnerability increased to 100 (from 80)
+				Cold Vulnerability increased to 100 (from 80)
+				Poison Vulnerability increased to 100 (from 80)
+				Lightning Vulnerability increased to 100 (from 80)
+				Harm Vulnerability increased to 100 (from 80)
+				Pike Vulnerability increased to 250 (from 225)
+
+Version: 1.4.02_05_prepatch5
+	TBD
